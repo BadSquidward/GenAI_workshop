@@ -120,7 +120,6 @@ try:
                 This variable should hold the answer to the user's question (e.g., a filtered DataFrame, a calculated value, etc.).
                 6. Assume the DataFrame is already loaded into a pandas DataFrame object named '{df_name}'. Do not include code to load the DataFrame.
                 7. Keep the generated code concise and focused on answering the question.
-                8. Give more opinion about answer by gemini
                 """
                 
                 # สร้างโค้ด Python ด้วย Gemini
