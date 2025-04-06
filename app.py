@@ -68,7 +68,7 @@ if user_input := st.chat_input("Type your message here..."):
  st.chat_message("assistant").markdown(bot_response)
  elif not analyze_data_checkbox:
  # Respond that analysis is not enabled if the checkbox is not selected
- bot_response = "Data analysis is disabled. Please select the 'Analyze CSV Data with AI' 
+ bot_response = 'Data analysis is disabled. Please select the 'Analyze CSV Data with AI' 
 checkbox to enable analysis."
 st.session_state.chat_history.append(("assistant", bot_response))
  st.chat_message("assistant").markdown(bot_response)
