@@ -128,7 +128,7 @@ try:
                 # แก้ไขบรรทัดที่มีปัญหา - เปลี่ยนจาก
                 # query = response.text.replace("```
                 # เป็น
-                query = response.text.replace("```
+               response.text.replace("```", "#")
                 
                 # แสดงโค้ดที่ AI สร้าง
                 with st.expander("ดูโค้ด Python ที่ AI สร้าง"):
