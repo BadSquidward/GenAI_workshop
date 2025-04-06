@@ -125,10 +125,8 @@ try:
                 # สร้างโค้ด Python ด้วย Gemini
                 response = model.generate_content(prompt)
                 
-                # แก้ไขบรรทัดที่มีปัญหา - เปลี่ยนจาก
-                # query = response.text.replace("```
-                # เป็น
-               response.text.replace("```", "#")
+                # แก้ไขบรรทัดที่มีปัญหา - ตัดเครื่องหมาย backticks
+                query = response.text.replace("```python", "").replace("```", "").strip()
                 
                 # แสดงโค้ดที่ AI สร้าง
                 with st.expander("ดูโค้ด Python ที่ AI สร้าง"):
