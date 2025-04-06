@@ -89,7 +89,7 @@ try:
         st.chat_message("user").markdown(user_input)
         
         # ตรวจสอบว่ามีข้อมูลพร้อมสำหรับตอบคำถามหรือไม่
-        if st.session_state.transaction_df is not None and st.session_state.data_dict_text is not None:
+        if st.session_state.transaction_df is not None and hasattr(st.session_state, 'data_dict_text'):
             try:
                 # สร้าง prompt สำหรับ RAG ตามแบบในบทเรียน
                 df_name = "transaction_df"
@@ -124,6 +124,10 @@ try:
                 
                 # สร้างโค้ด Python ด้วย Gemini
                 response = model.generate_content(prompt)
+                
+                # แก้ไขบรรทัดที่มีปัญหา - เปลี่ยนจาก
+                # query = response.text.replace("```
+                # เป็น
                 query = response.text.replace("```
                 
                 # แสดงโค้ดที่ AI สร้าง
