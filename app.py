@@ -3,111 +3,162 @@ import pandas as pd
 import google.generativeai as genai
 
 # ตั้งค่าหน้าแอป
-st.title('AI Chat Bot with CSV Analysis')
+st.title('Chat with Database using Gemini')
 
-# ตั้งค่า session state สำหรับเก็บประวัติแชทและข้อมูล CSV
+# ตั้งค่า Session State
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
     
-if "uploaded_data" not in st.session_state:
-    st.session_state.uploaded_data = None
+if "transaction_df" not in st.session_state:
+    st.session_state.transaction_df = None
+    
+if "data_dict_df" not in st.session_state:
+    st.session_state.data_dict_df = None
 
 # ตั้งค่า Gemini API
 try:
     key = st.secrets['gemini_api_key']
     genai.configure(api_key=key)
     model = genai.GenerativeModel('gemini-2.0-flash-lite')
-    
-    # ส่วนอัปโหลดไฟล์ CSV
-    st.subheader("Upload CSV for Analysis")
-    uploaded_file = st.file_uploader("Choose a CSV file", type=["csv"])
-    if uploaded_file is not None:
-        try:
-            # โหลดไฟล์ CSV ที่อัปโหลด
-            st.session_state.uploaded_data = pd.read_csv(uploaded_file)
-            st.success("File successfully uploaded and read.")
-            
-            # แสดงตัวอย่างข้อมูล
-            st.write("### Uploaded Data Preview")
-            st.dataframe(st.session_state.uploaded_data.head())
-            
-            # เพิ่มคำอธิบายของข้อมูล
-            data_dict_text = "\n".join([
-                f"- {col}: {st.session_state.uploaded_data[col].dtype}. Column {col}"
-                for col in st.session_state.uploaded_data.columns
-            ])
-            st.session_state.data_dict_text = data_dict_text
-            
-        except Exception as e:
-            st.error(f"Error reading file: {e}")
-    
-    # Checkbox สำหรับเลือกว่าจะวิเคราะห์ข้อมูลหรือไม่
-    analyze_data_checkbox = st.checkbox("Analyze CSV Data with AI")
-    
+
     # แสดงประวัติการแชท
     for message in st.session_state.chat_history:
         role, content = message
         st.chat_message(role).markdown(content)
-    
-    # รับข้อความจากผู้ใช้
-    if user_input := st.chat_input("Type your message here..."):
+
+    # ส่วนอัพโหลดไฟล์ CSV
+    with st.sidebar:
+        st.header("อัพโหลดข้อมูล")
+        
+        # อัพโหลด Transaction CSV
+        transaction_file = st.file_uploader("อัพโหลดไฟล์ Transaction CSV", type=["csv"])
+        if transaction_file is not None:
+            try:
+                # อ่านไฟล์และเก็บใน session state
+                st.session_state.transaction_df = pd.read_csv(transaction_file)
+                st.success("อัพโหลดไฟล์ Transaction สำเร็จ!")
+                
+                # แสดงตัวอย่างข้อมูล
+                st.write("ตัวอย่างข้อมูล:")
+                st.dataframe(st.session_state.transaction_df.head(2))
+                
+                # สร้างตัวอย่างข้อมูลสำหรับ AI
+                st.session_state.example_record = st.session_state.transaction_df.head(2).to_string()
+            except Exception as e:
+                st.error(f"เกิดข้อผิดพลาด: {e}")
+        
+        # อัพโหลด Data Dictionary CSV หรือสร้างอัตโนมัติ
+        data_dict_file = st.file_uploader("อัพโหลดไฟล์ Data Dictionary CSV (ถ้ามี)", type=["csv"])
+        
+        if data_dict_file is not None:
+            try:
+                st.session_state.data_dict_df = pd.read_csv(data_dict_file)
+                st.success("อัพโหลดไฟล์ Data Dictionary สำเร็จ!")
+            except Exception as e:
+                st.error(f"เกิดข้อผิดพลาด: {e}")
+        elif st.session_state.transaction_df is not None and st.button("สร้าง Data Dictionary อัตโนมัติ"):
+            # สร้าง Data Dictionary อัตโนมัติจากข้อมูล Transaction
+            data = []
+            for column in st.session_state.transaction_df.columns:
+                data_type = str(st.session_state.transaction_df[column].dtype)
+                data.append({
+                    "column_name": column,
+                    "data_type": data_type,
+                    "description": f"Column {column} with type {data_type}"
+                })
+            
+            st.session_state.data_dict_df = pd.DataFrame(data)
+            st.success("สร้าง Data Dictionary อัตโนมัติสำเร็จ!")
+            st.dataframe(st.session_state.data_dict_df)
+        
+        # สร้าง data_dict_text ถ้ามีข้อมูลครบ
+        if st.session_state.data_dict_df is not None:
+            try:
+                st.session_state.data_dict_text = '\n'.join([
+                    f"- {row['column_name']}: {row['data_type']}. {row['description']}" 
+                    for _, row in st.session_state.data_dict_df.iterrows()
+                ])
+                st.success("พร้อมใช้งานแล้ว! ถามคำถามเกี่ยวกับข้อมูลได้เลย")
+            except Exception as e:
+                st.error(f"เกิดข้อผิดพลาดในการสร้าง data_dict_text: {e}")
+                
+    # ช่องสำหรับรับคำถามจากผู้ใช้
+    if user_input := st.chat_input("ถามคำถามเกี่ยวกับข้อมูล..."):
         # เก็บและแสดงข้อความของผู้ใช้
         st.session_state.chat_history.append(("user", user_input))
         st.chat_message("user").markdown(user_input)
         
-        try:
-            # ตรวจสอบว่าผู้ใช้ต้องการวิเคราะห์ข้อมูลหรือไม่
-            if st.session_state.uploaded_data is not None and analyze_data_checkbox:
-                # ตรวจสอบว่าผู้ใช้ต้องการวิเคราะห์หรือขอข้อมูลเชิงลึก
-                if any(keyword in user_input.lower() for keyword in ["analyze", "insight", "data"]):
-                    # สร้างคำอธิบายข้อมูลสำหรับโมเดล AI
-                    data_description = st.session_state.uploaded_data.describe().to_string()
-                    example_record = st.session_state.uploaded_data.head(2).to_string()
+        # ตรวจสอบว่ามีข้อมูลพร้อมสำหรับตอบคำถามหรือไม่
+        if st.session_state.transaction_df is not None and st.session_state.data_dict_text is not None:
+            try:
+                # สร้าง prompt สำหรับ RAG ตามแบบในบทเรียน
+                df_name = "transaction_df"
+                prompt = f"""
+                You are a helpful Python code generator.
+                Your goal is to write Python code snippets based on the user's question
+                and the provided DataFrame information.
+                
+                Here's the context:
+                **User Question:**
+                {user_input}
+                
+                **DataFrame Name:**
+                {df_name}
+                
+                **DataFrame Details:**
+                {st.session_state.data_dict_text}
+                
+                **Sample Data (Top 2 Rows):**
+                {st.session_state.example_record}
+                
+                **Instructions:**
+                1. Write Python code that addresses the user's question by querying or manipulating the DataFrame.
+                2. **Crucially, use the `exec()` function to execute the generated code.**
+                3. Do not import pandas
+                4. Change date column type to datetime if needed
+                5. **Store the result of the executed code in a variable named `ANSWER`.**
+                This variable should hold the answer to the user's question (e.g., a filtered DataFrame, a calculated value, etc.).
+                6. Assume the DataFrame is already loaded into a pandas DataFrame object named '{df_name}'. Do not include code to load the DataFrame.
+                7. Keep the generated code concise and focused on answering the question.
+                """
+                
+                # สร้างโค้ด Python ด้วย Gemini
+                response = model.generate_content(prompt)
+                query = response.text.replace("```
+                
+                # แสดงโค้ดที่ AI สร้าง
+                with st.expander("ดูโค้ด Python ที่ AI สร้าง"):
+                    st.code(query)
+                
+                # รันโค้ดเพื่อหาคำตอบ
+                transaction_df = st.session_state.transaction_df  # กำหนดตัวแปรสำหรับ exec()
+                try:
+                    # ประกาศตัวแปร ANSWER สำหรับเก็บผลลัพธ์
+                    ANSWER = None
+                    exec(query)
                     
-                    # สร้าง prompt สำหรับ RAG
-                    prompt = f"""
-                    You are a helpful Python code generator.
-                    Your goal is to answer the user's question by analyzing the provided data.
-                    
-                    Here's the context:
-                    **User Question:**
-                    {user_input}
-                    
-                    **DataFrame Details:**
-                    {st.session_state.data_dict_text}
-                    
-                    **Sample Data (Top 2 Rows):**
-                    {example_record}
-                    
-                    **Data Summary:**
-                    {data_description}
-                    
-                    Based on this information, please:
-                    1. Write Python code that addresses the user's question
-                    2. Execute the code to get the answer
-                    3. Explain the results in a way that's easy to understand
+                    # สร้าง prompt เพื่ออธิบายผลลัพธ์
+                    explain_prompt = f"""
+                    The user asked: {user_input}
+                    Here is the result: {ANSWER}
+                    Please answer the question and summarize the answer in Thai language.
+                    Make it easy to understand.
                     """
                     
-                    # สร้างคำตอบจาก AI สำหรับการวิเคราะห์ข้อมูล
-                    response = model.generate_content(prompt)
-                    bot_response = response.text
-                else:
-                    # พูดคุยปกติกับบอท
-                    response = model.generate_content(user_input)
-                    bot_response = response.text
-            elif not analyze_data_checkbox and st.session_state.uploaded_data is not None:
-                # แจ้งว่าการวิเคราะห์ไม่ได้เปิดใช้งาน
-                bot_response = 'Data analysis is disabled. Please select the "Analyze CSV Data with AI" checkbox to enable analysis.'
-            else:
-                # แจ้งให้อัปโหลดไฟล์ CSV ก่อน
-                bot_response = "Please upload a CSV file first, then ask me to analyze it."
-            
-            # เก็บและแสดงคำตอบจากบอท
-            st.session_state.chat_history.append(("assistant", bot_response))
-            st.chat_message("assistant").markdown(bot_response)
-            
-        except Exception as e:
-            st.error(f"An error occurred: {e}")
-            
+                    # ให้ AI อธิบายผลลัพธ์
+                    explain_response = model.generate_content(explain_prompt)
+                    bot_response = explain_response.text
+                except Exception as e:
+                    bot_response = f"เกิดข้อผิดพลาดในการรันโค้ด: {e}"
+            except Exception as e:
+                bot_response = f"เกิดข้อผิดพลาดในการวิเคราะห์: {e}"
+        else:
+            # แจ้งเตือนกรณีข้อมูลไม่พร้อม
+            bot_response = "กรุณาอัพโหลดไฟล์ Transaction.csv และสร้าง Data Dictionary ก่อนถามคำถาม"
+        
+        # เก็บและแสดงคำตอบจากบอท
+        st.session_state.chat_history.append(("assistant", bot_response))
+        st.chat_message("assistant").markdown(bot_response)
+        
 except Exception as e:
-    st.error(f'Error initializing Gemini API: {e}')
+    st.error(f'เกิดข้อผิดพลาดในการเริ่มต้น: {e}')
